@@ -29,10 +29,12 @@ export const GOLD_EXAMPLE_SEED = [{
   ],
 }];
 
+// 実施する場所。カレンダーの「1日を4つに分けた印」にも同じ4つを使う
 export const LOCATIONS = [
-  { key: '学校', icon: '🏫' },
-  { key: '家', icon: '🏠' },
-  { key: '放課後等デイ', icon: '🚌' },
+  { key: '学校', icon: '🏫', color: '#7fb3e6' },
+  { key: '家', icon: '🏠', color: '#f4a261' },
+  { key: '放課後等デイ', icon: '🚌', color: '#7cc9a0' },
+  { key: 'その他', icon: '📍', color: '#b39ddb' },
 ];
 
 // ターン順のデフォルト: 本人 → 保護者 → 支援者(8章)

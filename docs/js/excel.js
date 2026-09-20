@@ -24,7 +24,7 @@ export function buildSheets(st) {
   const info = [
     ['対象児ID', st.child.child_code], ['区分', st.child.is_test ? 'テスト' : '本番'], ['年齢', st.child.age ?? ''], ['性別', st.child.sex ?? ''],
     ['実施日', fmtDate(st.session.held_at)], ['期間(月)', st.session.duration_months],
-    ['次回振り返り日', st.session.next_review_date || ''],
+    ['中間確認日', st.session.mid_review_date || ''], ['最後の振り返り日', st.session.next_review_date || ''],
     ['参加者', [...st.sessionParticipants].sort((a, b) => a.turn_order - b.turn_order).map((sp) => roleOf(sp.participant_id)).join('、')],
     ['担当セラピスト', st.user?.name || ''],
   ];

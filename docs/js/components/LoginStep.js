@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { state, login, register, demoLogin, createChild, pickChild, nameOf, exportRoster } from '../store.js';
+import { state, login, register, demoLogin, createChild, pickChild, nameOf, exportRoster, openCalendar } from '../store.js';
 
 // ステップ0: ログイン + 対象児の選択
 export const LoginStep = {
@@ -21,7 +21,7 @@ export const LoginStep = {
     };
     const adding = ref(false);
     const submit = () => (mode.value === 'login' ? login(f.value.email, f.value.password) : register(f.value.name, f.value.email, f.value.password));
-    return { state, mode, f, newChild, adding, openAdd, sorted, query, showExport, pw, exported, doExport, nameOf, submit, demoLogin, createChild, pickChild };
+    return { state, mode, f, newChild, adding, openAdd, sorted, openCalendar, query, showExport, pw, exported, doExport, nameOf, submit, demoLogin, createChild, pickChild };
   },
   template: `
     <section class="card center-card">
@@ -52,11 +52,14 @@ export const LoginStep = {
 
         <input v-if="state.children.length > 3" v-model="query" class="search" placeholder="🔍 名前またはIDで検索">
         <div v-if="state.children.length" class="child-list">
-          <button v-for="c in sorted()" :key="c.id" class="child-btn" @click="pickChild(c)">
-            <span class="child-emoji">🧒</span>
-            <span><b>{{ nameOf(c.id) || '(名前なし)' }}</b><span v-if="c.is_test" class="test-badge">テスト</span><small>ID {{ c.child_code }}　{{ c.age != null ? c.age + '歳' : '' }} {{ c.sex || '' }}</small></span>
-            <span class="hint">既存の対象児で目標を再設定 →</span>
-          </button>
+          <div v-for="c in sorted()" :key="c.id" class="child-row">
+            <button class="child-btn" @click="pickChild(c)">
+              <span class="child-emoji">🧒</span>
+              <span><b>{{ nameOf(c.id) || '(名前なし)' }}</b><span v-if="c.is_test" class="test-badge">テスト</span><small>ID {{ c.child_code }}　{{ c.age != null ? c.age + '歳' : '' }} {{ c.sex || '' }}</small></span>
+              <span class="hint">目標をつくる・つくり直す →</span>
+            </button>
+            <button v-if="state.latestSession[c.id]" class="cal-btn" @click="openCalendar(c)">📅<small>カレンダー</small></button>
+          </div>
         </div>
         <p v-else class="muted">まだ対象児がいません。下から登録してください。</p>
 

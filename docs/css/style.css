@@ -35,10 +35,10 @@ h3 { font-size: 1.1rem; margin: 1.2em 0 .3em; }
 .spacer { flex: 1; }
 
 /* ---- レイアウト ---- */
-.topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--card); border-bottom: 2px solid var(--line); }
-.brand { font-weight: 700; font-size: 1.15rem; margin-right: auto; }
+.topbar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding: 10px 16px; background: var(--card); border-bottom: 2px solid var(--line); }
+.brand { font-weight: 700; font-size: 1.15rem; margin-right: auto; white-space: nowrap; }
 .demo-badge { font-size: .7rem; background: var(--sun); border-radius: 999px; padding: 1px 8px; vertical-align: middle; }
-.who { font-weight: 700; white-space: nowrap; }
+.who { font-weight: 700; white-space: nowrap; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
 .search { width: 100%; margin: 6px 0; }
 .roster-export { margin-top: 18px; text-align: center; }
 .test-badge { font-size: .7rem; background: var(--sun); color: #5a3d00; border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: middle; font-weight: 700; }
@@ -227,3 +227,65 @@ input[type=range] { accent-color: var(--primary); min-height: 0; padding: 0; }
 .doc ul { padding-left: 1.3em; }
 .doc .en { margin-top: 2em; padding-top: 1em; border-top: 2px dashed var(--line); color: var(--muted); font-size: .95rem; }
 .doc .updated { color: var(--muted); font-size: .9rem; }
+
+/* ---- カレンダー(最後の日・中間確認日・やった日のスタンプ) ---- */
+.child-row { display: flex; gap: 8px; align-items: stretch; }
+.child-row .child-btn { flex: 1; }
+.cal-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 76px; border: 3px solid var(--line); background: #fff; border-radius: 16px; font-size: 1.5rem; padding: 6px; }
+.cal-btn small { font-size: .7rem; }
+.cal-btn:hover { border-color: var(--primary); }
+.cal-goals { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.cal-tools { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.cal-tools button { border: 3px solid var(--line); background: #fff; border-radius: 999px; padding: .35em 1.1em; font-weight: 700; min-height: 44px; }
+.cal-tools button.on { border-color: var(--primary); background: #fff0ea; }
+.cal-help { margin: 4px 0 8px; color: var(--muted); font-size: .92rem; }
+.cal-hint .row { margin-top: 6px; }
+.cal-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; }
+.cal-head b { font-size: 1.15rem; min-width: 7.5em; text-align: center; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.cal-grid .dow { text-align: center; font-size: .8rem; color: var(--muted); padding: 2px 0; }
+.cal-grid .dow:first-child { color: #d64545; }
+.cal-grid .dow:nth-child(7) { color: #3d86c6; }
+.cell-wrap { min-height: 66px; }
+.cell { position: relative; width: 100%; height: 100%; min-height: 66px; border: 2px solid var(--line); background: #fff; border-radius: 10px; padding: 2px; display: flex; flex-direction: column; }
+.cell.period { background: #fffaf2; }
+.cell.future .dn { opacity: .55; }
+.cell.today { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.cell.sel { outline: 3px solid var(--sun); outline-offset: 1px; }
+.cell.final { border-color: var(--primary); background: #fff0ea; }
+.cell.mid { border-color: #7a5cc4; background: #f3eefc; }
+.dayhit { position: absolute; inset: 0; z-index: 1; border: 0; background: transparent; border-radius: 8px; padding: 0; cursor: pointer; }
+.cell .dn { font-size: .85rem; font-weight: 700; line-height: 1.1; padding-left: 3px; pointer-events: none; }
+.cell .flag { position: absolute; top: 0; right: 2px; font-size: .9rem; pointer-events: none; }
+.quad { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin-top: auto; pointer-events: none; }
+.qbtn { display: grid; place-items: center; height: 15px; border: 0; padding: 0; border-radius: 4px; background: #eee; color: #fff; font: inherit; font-size: .62rem; line-height: 1; pointer-events: none; }
+.qbtn .qi { display: none; }
+.qbtn.pop { animation: stamp-pop .6s ease-out; }
+@keyframes stamp-pop { 0% { transform: scale(.2); } 45% { transform: scale(1.8); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .qbtn.pop { animation: none; } }
+/* PC・タブレット: マスの中の枠を直接タップして印をつける(スマホは日をタップ→大きなボタン) */
+@media (min-width: 768px) {
+  .cell-wrap, .cell { min-height: 92px; }
+  .quad { pointer-events: auto; gap: 3px; }
+  .qbtn { height: 30px; pointer-events: auto; cursor: pointer; grid-auto-flow: column; gap: 3px; font-size: .8rem; }
+  .qbtn .qi { display: inline; font-size: .85rem; opacity: .45; }
+  .qbtn.on .qi { opacity: 1; }
+  .qbtn:hover { outline: 2px solid var(--sun); }
+}
+.day-panel { border: 2px dashed var(--line); border-radius: 14px; padding: 10px 12px; margin: 10px 0; }
+.place-btns { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 8px; }
+.place-btn { display: flex; flex-direction: column; align-items: center; gap: 2px; border: 3px solid; background: #fff; border-radius: 16px; padding: 8px; min-height: 76px; font-weight: 700; }
+.place-btn .pi { font-size: 1.6rem; }
+.place-btn .pm { font-size: .8rem; font-weight: 500; }
+.place-btn.on { color: #fff; }
+.cal-summary { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 0; font-size: 1.05rem; }
+.cal-legend { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.cal-legend .lg { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 3px; vertical-align: -1px; }
+.cal-export { margin-top: 14px; border-top: 2px dashed var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.cal-export .row { align-items: center; }
+@media (max-width: 600px) {
+  .cell-wrap, .cell { min-height: 58px; }
+  .cell .dn { font-size: .78rem; }
+  .qbtn { height: 13px; }
+  .cal-head b { min-width: 6.5em; }
+}

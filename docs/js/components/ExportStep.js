@@ -17,7 +17,7 @@ export const ExportStep = {
       <p class="muted">ここまでの内容をExcelにまとめます(この端末の中で作られます)。</p>
 
       <div class="summary">
-        <div class="muted">期間 {{ state.session.duration_months }}か月 / 振り返り日 {{ state.session.next_review_date }}</div>
+        <div class="muted">期間 {{ state.session.duration_months }}か月 / <template v-if="state.session.mid_review_date">中間確認日 {{ state.session.mid_review_date }} / </template>最後の振り返り日 {{ state.session.next_review_date }}</div>
         <div v-for="g in goalsSorted" :key="g.id" class="summary-goal">
           <Illust :value="g.illustration_ref" :size="48" :label="false" />
           <div>

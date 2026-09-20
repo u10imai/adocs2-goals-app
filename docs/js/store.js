@@ -18,12 +18,16 @@ const freshDraft = () => ({
   roles: [...DEFAULT_ROLES], customRole: '', months: 6, customMonths: false,
   policy: { safety: 0, pace: 0 },
   goalDraft: [], // [{ ref, locs: ['学校', ...] }] 優先順位順
-  reviewDate: '',
+  reviewDate: '', // 最後の振り返り日(必須)
+  midDate: '',    // 中間確認日(1つだけ・任意)
 });
 
 export const state = reactive({
   ready: false, busy: false, error: '', isDemo: DEMO,
   user: null, children: [], child: null,
+  practice: [],        // やった日の記録(practice_log)
+  latestSession: {},   // child_id -> その対象児の最新の回(カレンダーを開くため)
+  calendarView: false, // true の間は、目標づくりの流れではなくカレンダーだけを表示
   roster: {}, // child_id -> 名前(自分の担当分だけ。名簿は目標データとは別テーブル)
   canExportRoster: false,
   step: 0, maxStep: 0,
@@ -53,6 +57,11 @@ async function afterLogin() {
   await loadTags();
   await loadCustomIllustrations();
   state.children = await db().list('child', { therapist_id: state.user.id });
+  const mine = new Set(state.children.map((c) => c.id));
+  state.latestSession = {};
+  for (const s of (await db().list('session')).filter((x) => mine.has(x.child_id)).sort((a, b) => a.held_at.localeCompare(b.held_at))) {
+    state.latestSession[s.child_id] = s;
+  }
   const names = await db().rosterMine();
   state.roster = Object.fromEntries(names.map((r) => [r.child_id, r.name]));
   state.canExportRoster = await db().canExportRoster().catch(() => false);
@@ -78,7 +87,7 @@ export const demoLogin = (name) => run(async () => { state.user = await auth.dem
 export async function logout() {
   await auth.signOut();
   resetSession();
-  Object.assign(state, { user: null, child: null, children: [], roster: {}, canExportRoster: false, step: 0, maxStep: 0 });
+  Object.assign(state, { user: null, child: null, children: [], roster: {}, canExportRoster: false, latestSession: {}, calendarView: false, step: 0, maxStep: 0 });
 }
 
 /* ---------- マスタ(タグ・お手本・独自イラスト) ---------- */
@@ -122,7 +131,7 @@ export const info = (ref) => illustInfo(ref, state.customIllustrations);
 export function resetSession() {
   Object.assign(state, {
     participants: [], session: null, sessionParticipants: [], selections: [],
-    goals: [], goalLocations: [], subSteps: [], subStepTags: [], policy: null,
+    goals: [], goalLocations: [], subSteps: [], subStepTags: [], policy: null, practice: [],
     draft: freshDraft(), activeSpId: null, activeUnit: null, completedUnits: {}, maxStep: 0,
   });
 }
@@ -223,6 +232,7 @@ async function saveBasics() {
     const row = { id: uuid(), child_id: state.child.id, duration_months: months, held_at: new Date().toISOString(), next_review_date: null };
     await db().insert('session', row);
     state.session = row;
+    state.latestSession[state.child.id] = row;
   } else {
     state.session.duration_months = months;
     await db().update('session', state.session.id, { duration_months: months });
@@ -568,16 +578,103 @@ function defaultReviewDate() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
+export const ymdLocal = (d) => {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+};
+export const todayStr = () => ymdLocal(new Date());
+
+// 日程(最後の日・中間確認日)をDBへ保存。目標づくりの流れでは「次へ」で、カレンダーだけを開いているときは選ぶたびに保存
+async function persistDates() {
+  const fin = state.draft.reviewDate || null;
+  const mid = state.draft.midDate || null;
+  state.session.next_review_date = fin;
+  state.session.mid_review_date = mid;
+  await db().update('session', state.session.id, { next_review_date: fin, mid_review_date: mid });
+}
+
 async function saveReviewDate() {
-  const date = state.draft.reviewDate;
-  state.session.next_review_date = date;
-  await db().update('session', state.session.id, { next_review_date: date });
+  await persistDates();
+}
+
+// 最後の振り返り日を選ぶ(必ず1つ)。戻り値: 'ok' | 'past'
+export async function setFinalDate(date) {
+  if (date < todayStr()) return 'past';
+  state.draft.reviewDate = date;
+  if (state.draft.midDate && state.draft.midDate >= date) state.draft.midDate = ''; // 中間は最後より前でなければならない
+  if (state.calendarView) await persistDates();
+  return 'ok';
+}
+
+// 中間確認日を選ぶ(1つだけ・なくてもよい。もう一度同じ日を選ぶと外れる)。戻り値: 'set' | 'cleared' | 'no_final' | 'after_final'
+export async function setMidDate(date) {
+  if (state.draft.midDate === date) {
+    state.draft.midDate = '';
+    if (state.calendarView) await persistDates();
+    return 'cleared';
+  }
+  if (!state.draft.reviewDate) return 'no_final';
+  if (date >= state.draft.reviewDate) return 'after_final';
+  state.draft.midDate = date;
+  if (state.calendarView) await persistDates();
+  return 'set';
+}
+
+// 「期間の真ん中の日」をおすすめとして返す
+export function suggestMidDate() {
+  const a = new Date(state.session.held_at);
+  const b = new Date(`${state.draft.reviewDate}T00:00:00`);
+  const mid = ymdLocal(new Date((a.getTime() + b.getTime()) / 2));
+  return mid < todayStr() ? todayStr() : mid;
+}
+
+/* ---------- カレンダー: やった日のスタンプ ---------- */
+// 「目標ごと」ではなく「その日・その場所で、何かに取り組んだ」印。過去の日はすべて押せる(あとから聞き取った分もOK)。未来の日は押せない
+
+export const stampsOn = (date) => state.practice.filter((p) => p.log_date === date).map((p) => p.location_category);
+
+// 戻り値: 'added' | 'removed' | 'future'
+export async function toggleStamp(date, place) {
+  if (date > todayStr()) return 'future';
+  const ex = state.practice.find((p) => p.log_date === date && p.location_category === place);
+  if (ex) {
+    await db().remove('practice_log', { id: ex.id });
+    state.practice = state.practice.filter((p) => p.id !== ex.id);
+    return 'removed';
+  }
+  const row = { id: uuid(), session_id: state.session.id, log_date: date, location_category: place, logged_by: 'therapist' };
+  await db().insert('practice_log', row);
+  state.practice.push(row);
+  return 'added';
+}
+
+// 目標づくりのあとに、カレンダーだけを開く(記録・見返し用)
+export const openCalendar = (child) => run(async () => {
+  const s = state.latestSession[child.id];
+  if (!s) throw new Error('この対象児には、まだ目標がありません');
+  resetSession();
+  state.child = child;
+  state.session = s;
+  state.goals = await db().list('goal', { session_id: s.id });
+  state.goalLocations = [];
+  for (const g of state.goals) state.goalLocations.push(...(await db().list('goal_location', { goal_id: g.id })));
+  state.practice = await db().list('practice_log', { session_id: s.id });
+  state.draft.reviewDate = s.next_review_date || '';
+  state.draft.midDate = s.mid_review_date || '';
+  state.calendarView = true;
+});
+
+export function closeCalendar() {
+  resetSession();
+  state.child = null;
+  state.calendarView = false;
 }
 
 /* ---------- 終了 ---------- */
 
 export function finishAll() {
   resetSession();
+  state.calendarView = false;
   state.child = null;
   state.step = 0;
 }

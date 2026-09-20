@@ -1,5 +1,5 @@
 import { createApp, computed, onMounted } from 'vue';
-import { state, init, next, prev, go, logout, skipPolicy, canNext, nameOf } from './store.js';
+import { state, init, next, prev, go, logout, skipPolicy, canNext, nameOf, closeCalendar } from './store.js';
 import { STEP_TITLES } from './data/master.js';
 import { LoginStep } from './components/LoginStep.js';
 import { BasicsStep } from './components/BasicsStep.js';
@@ -10,15 +10,16 @@ import { StrategyStep } from './components/StrategyStep.js';
 import { DecomposeStep } from './components/DecomposeStep.js';
 import { ReviewDateStep } from './components/ReviewDateStep.js';
 import { ExportStep } from './components/ExportStep.js';
+import { CalendarPage } from './components/CalendarPage.js';
 
 const App = {
-  components: { LoginStep, BasicsStep, PolicyStep, PickStep, NarrowStep, StrategyStep, DecomposeStep, ReviewDateStep, ExportStep },
+  components: { LoginStep, BasicsStep, PolicyStep, PickStep, NarrowStep, StrategyStep, DecomposeStep, ReviewDateStep, ExportStep, CalendarPage },
   setup() {
     onMounted(init);
     // 進捗バーに出す画面(ステップ6は複数場所があるときだけ)
     const nextLabel = computed(() => (state.step === 8 ? '計画書へ →' : '次へ →'));
     const showNav = computed(() => state.step > 0 && state.step < 9 && !state.activeUnit);
-    return { state, STEP_TITLES, next, prev, go, logout, skipPolicy, canNext, nextLabel, showNav, nameOf };
+    return { state, STEP_TITLES, next, prev, go, logout, skipPolicy, canNext, nextLabel, showNav, nameOf, closeCalendar };
   },
   template: `
     <div class="app" :class="{ clinical: state.step === 7 }">
@@ -38,7 +39,12 @@ const App = {
         <div v-if="!state.ready" class="card center-card">よみこみ中…</div>
         <template v-else>
           <div v-if="state.error" class="error-banner" role="alert">{{ state.error }}</div>
-          <LoginStep v-if="state.step === 0" />
+          <section v-if="state.calendarView" class="card">
+            <button class="link" @click="closeCalendar">← 対象児の選択へもどる</button>
+            <h2>📅 カレンダー</h2>
+            <CalendarPage mode="standalone" />
+          </section>
+          <LoginStep v-else-if="state.step === 0" />
           <BasicsStep v-else-if="state.step === 1" />
           <PolicyStep v-else-if="state.step === 2" mode="draft" />
           <PickStep v-else-if="state.step === 3" />

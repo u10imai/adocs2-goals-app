@@ -52,7 +52,8 @@ create table session (
   child_id uuid not null references child(id) on delete cascade,
   duration_months int not null,
   held_at timestamptz not null default now(),
-  next_review_date date,
+  next_review_date date,  -- 最後の振り返り日(必ず決める)
+  mid_review_date date,   -- 中間確認日(1つだけ・なくてもよい)
   created_at timestamptz not null default now()
 );
 
@@ -143,7 +144,19 @@ create table custom_illustration (
   created_at timestamptz not null default now()
 );
 
+-- やった日の記録(カレンダーのスタンプ)。「目標」ではなく「その日、その場所で何かに取り組んだ」印
+create table practice_log (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references session(id) on delete cascade,
+  log_date date not null,
+  location_category text not null,  -- 学校 / 家 / 放課後等デイ / その他
+  logged_by text not null default 'therapist', -- 入力した人・入口(将来: 家族用リンクなど)
+  created_at timestamptz not null default now(),
+  unique (session_id, log_date, location_category)
+);
+
 create index on child (therapist_id);
+create index on practice_log (session_id);
 create index on participant (child_id);
 create index on session (child_id);
 create index on session_participant (session_id);
@@ -184,6 +197,7 @@ alter table tag enable row level security;
 alter table sub_step_tag enable row level security;
 alter table gold_example enable row level security;
 alter table custom_illustration enable row level security;
+alter table practice_log enable row level security;
 
 create policy own_account on therapist_account for all to authenticated using (id = auth.uid()) with check (id = auth.uid());
 create policy own_child on child for all to authenticated using (therapist_id = auth.uid()) with check (therapist_id = auth.uid());
@@ -196,6 +210,7 @@ create policy own_policy on policy_weight for all to authenticated using (owns_s
 create policy own_goal_location on goal_location for all to authenticated using (owns_goal(goal_id)) with check (owns_goal(goal_id));
 create policy own_sub_step on sub_step for all to authenticated using (owns_goal_location(goal_location_id)) with check (owns_goal_location(goal_location_id));
 create policy own_sub_step_tag on sub_step_tag for all to authenticated using (owns_sub_step(sub_step_id)) with check (owns_sub_step(sub_step_id));
+create policy own_practice_log on practice_log for all to authenticated using (owns_session(session_id)) with check (owns_session(session_id));
 create policy own_custom_illustration on custom_illustration for all to authenticated using (therapist_id = auth.uid()) with check (therapist_id = auth.uid());
 
 -- タグ・お手本は全セラピスト共通の辞書(閲覧・追加のみ。編集・削除は不可)。誰が登録できるかは保留事項
