@@ -3,11 +3,12 @@ import Sortable from 'sortablejs';
 import {
   state, unitList, stepsOf, tagLinksOf, addStep, saveStep, deleteStep, moveStep, reorderSteps,
   toggleStepTag, removeStepTag, saveMemo, createTag, completeUnit, reopenUnit, applyAiSteps,
-  registerGoldExample, run, info, MAX_STEPS,
+  registerGoldExample, addBlankFrames, tooManyCards, run, info, MAX_STEPS, CARD_WARN_AT,
 } from '../store.js';
 import { CATEGORIES, catOf } from '../data/master.js';
 import { decomposeSteps } from '../ai.js';
 import { Illust } from './common.js';
+import { StrategyPanel } from './StrategyStep.js';
 
 // ドラッグ&ドロップ(タブレット・PC)。Vueが描画するDOMと競合しないよう、ドロップ後にDOMを元に戻してからstateを更新する
 const vSortable = {
@@ -93,9 +94,9 @@ const StepCard = {
     </div>`,
 };
 
-// ステップ7: 工程分解 + 調整戦略タグ付け(セラピスト向け・実用重視の画面)
+// ステップ6: 場所ごとの工夫の選択 + 工程分解 + 調整戦略タグ付け(セラピスト向け・実用重視の画面)
 export const DecomposeStep = {
-  components: { Illust, StepCard },
+  components: { Illust, StepCard, StrategyPanel },
   directives: { sortable: vSortable },
   setup() {
     const aiText = ref('');
@@ -125,23 +126,28 @@ export const DecomposeStep = {
       }
       aiBusy.value = false;
     };
+    // 工程が空欄のカードは、そのまま「できた」にできる(あとで手書きする使い方)。表示するカードは、多すぎる警告が出ている間は(警告の枚数-1)枚までだけ
+    const shownUnits = computed(() => (tooManyCards.value ? unitList.value.slice(0, CARD_WARN_AT - 1) : unitList.value));
+    const manual = () => run(async () => { await addBlankFrames(active.value.loc.id, 3); aiMsg.value = '空の枠を入れました。あとで入力・手書きでもOKです。'; });
     const saveGold = () => run(async () => {
       await registerGoldExample(aiText.value, active.value.loc.id);
       goldMsg.value = 'お手本として登録しました。';
     });
-    return { state, unitList, active, steps, aiText, aiBusy, aiMsg, goldMsg, open, runAi, saveGold, addStep, deleteStep, moveStep, reorderSteps, completeUnit, reopenUnit, info, MAX_STEPS };
+    return { shownUnits, manual, state, unitList, active, steps, aiText, aiBusy, aiMsg, goldMsg, open, runAi, saveGold, addStep, deleteStep, moveStep, reorderSteps, completeUnit, reopenUnit, info, MAX_STEPS };
   },
   template: `
     <section class="card clinical">
       <template v-if="!active">
         <h2>工程に分けて、工夫を つけよう</h2>
-        <p class="muted">目標ごとに 1つずつ 作業します(順番は自由)。すべて「完了」になると次へ進めます。</p>
+        <StrategyPanel />
+        <h3>カードを ひらいて、工程と工夫を 入れます</h3>
+        <p class="muted small">順番は自由です。入力しなくても 次へ進めます(あとで手書きでもOK)。</p>
         <div class="unit-list">
-          <button v-for="u in unitList" :key="u.key" class="unit-card" :class="{ done: state.completedUnits[u.key] }" @click="open(u)">
+          <button v-for="(u, i) in shownUnits" :key="u.key" class="unit-card" :class="{ done: state.completedUnits[u.key] }" :style="{ animationDelay: i * 90 + 'ms' }" @click="open(u)">
             <Illust :value="u.goal.illustration_ref" :size="64" />
             <div class="unit-meta">
               <b>{{ u.label }}<span v-if="u.shared" class="tag-pill">共通</span></b>
-              <span class="muted">{{ state.completedUnits[u.key] ? '✅ 完了' : '未完了' }}</span>
+              <span class="muted">{{ state.completedUnits[u.key] ? '✅ できた' : 'まだ' }}</span>
             </div>
           </button>
         </div>
@@ -153,16 +159,16 @@ export const DecomposeStep = {
           <Illust :value="active.goal.illustration_ref" :size="56" />
           <h2>{{ info(active.goal.illustration_ref).label }} <small>@ {{ active.label }}</small></h2>
         </div>
-        <p v-if="active.shared" class="notice small">「同じ工夫」モード: {{ active.label }} に同じ内容をコピーします(完了時)。</p>
+        <p v-if="active.shared" class="notice small">「どこでも同じ」: {{ active.label }} に同じ内容をコピーします(「できた」を押したとき)。</p>
 
         <div class="ai-panel">
-          <div class="ai-title">🤖 AIで工程の案を作る <span class="muted small">(案を出すだけ。確認・修正はセラピストが行います)</span></div>
-          <label>目標の説明<input v-model="aiText" maxlength="100" placeholder="例: 食事(スプーンで自分で食べる)"></label>
-          <p class="warn small">⚠ 氏名・学校名・写真などの個人情報は書かないでください(この文だけが送信されます)。</p>
-          <div class="row">
-            <button class="secondary" :disabled="aiBusy || !aiText.trim()" @click="runAi">{{ aiBusy ? '考え中…' : '工程案を作る' }}</button>
-            <button class="secondary" :disabled="!steps.length" title="今の工程を、AIが参考にするお手本として登録" @click="saveGold">⭐ この工程をお手本に登録</button>
+          <label>目標の説明(AIに渡す文)<input v-model="aiText" maxlength="100" placeholder="例: 食事(スプーンで自分で食べる)"></label>
+          <div class="row ai-buttons">
+            <button class="secondary" :disabled="aiBusy || !aiText.trim()" @click="runAi">{{ aiBusy ? '考え中…' : '🤖 AIで工程案を作る' }}</button>
+            <button class="secondary" :disabled="state.busy" title="空の枠を入れます。手で入力・あとで手書きしたいとき" @click="manual">✍️ 手で作る(枠だけ)</button>
+            <button class="secondary" :disabled="!steps.length" title="今の工程を、AIが参考にするお手本として登録" @click="saveGold">⭐ この工程案を登録</button>
           </div>
+          <p class="muted small">AIは案を出すだけです。確認・修正はセラピストが行います。</p>
           <p v-if="aiMsg" class="small" :class="{ error: aiMsg.includes('利用できません') }">{{ aiMsg }}</p>
           <p v-if="goldMsg" class="small">{{ goldMsg }}</p>
         </div>
@@ -173,8 +179,9 @@ export const DecomposeStep = {
         </div>
         <div class="steps-foot">
           <button class="secondary" :disabled="steps.length >= MAX_STEPS" @click="addStep(active.loc.id)">＋ 工程を追加({{ steps.length }}/{{ MAX_STEPS }})</button>
-          <button class="primary big" :disabled="state.busy" @click="completeUnit(active)">この目標を完了 ✔</button>
+          <button class="primary big" :disabled="state.busy" @click="completeUnit(active)">できた ✔</button>
         </div>
+        <p class="fine-print">※ AIに送るのは「目標の説明」の文だけです。氏名・学校名・写真などの個人情報は書かないでください。</p>
       </template>
     </section>`,
 };

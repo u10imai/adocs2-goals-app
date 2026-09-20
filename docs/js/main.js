@@ -1,28 +1,26 @@
 import { createApp, computed, onMounted } from 'vue';
-import { state, init, next, prev, go, logout, skipPolicy, canNext, nameOf, closeCalendar } from './store.js';
+import { state, init, next, prev, go, logout, skipPolicy, canNext, nameOf, closeCalendar, LAST_STEP } from './store.js';
 import { STEP_TITLES } from './data/master.js';
 import { LoginStep } from './components/LoginStep.js';
 import { BasicsStep } from './components/BasicsStep.js';
 import { PolicyStep } from './components/PolicyStep.js';
 import { PickStep } from './components/PickStep.js';
 import { NarrowStep } from './components/NarrowStep.js';
-import { StrategyStep } from './components/StrategyStep.js';
 import { DecomposeStep } from './components/DecomposeStep.js';
 import { ReviewDateStep } from './components/ReviewDateStep.js';
 import { ExportStep } from './components/ExportStep.js';
 import { CalendarPage } from './components/CalendarPage.js';
 
 const App = {
-  components: { LoginStep, BasicsStep, PolicyStep, PickStep, NarrowStep, StrategyStep, DecomposeStep, ReviewDateStep, ExportStep, CalendarPage },
+  components: { LoginStep, BasicsStep, PolicyStep, PickStep, NarrowStep, DecomposeStep, ReviewDateStep, ExportStep, CalendarPage },
   setup() {
     onMounted(init);
-    // 進捗バーに出す画面(ステップ6は複数場所があるときだけ)
-    const nextLabel = computed(() => (state.step === 8 ? '計画書へ →' : '次へ →'));
-    const showNav = computed(() => state.step > 0 && state.step < 9 && !state.activeUnit);
-    return { state, STEP_TITLES, next, prev, go, logout, skipPolicy, canNext, nextLabel, showNav, nameOf, closeCalendar };
+    const nextLabel = computed(() => (state.step === LAST_STEP - 1 ? '計画書へ →' : '次へ →'));
+    const showNav = computed(() => state.step > 0 && state.step < LAST_STEP && !state.activeUnit);
+    return { LAST_STEP, state, STEP_TITLES, next, prev, go, logout, skipPolicy, canNext, nextLabel, showNav, nameOf, closeCalendar };
   },
   template: `
-    <div class="app" :class="{ clinical: state.step === 7 }">
+    <div class="app" :class="{ clinical: state.step === 6 }">
       <header class="topbar">
         <div class="brand">🌈 もくひょうアプリ <span v-if="state.isDemo" class="demo-badge">デモ</span></div>
         <div v-if="state.child" class="who">🧒 {{ nameOf(state.child.id) }}({{ state.child.child_code }}) <span v-if="state.child.is_test" class="test-badge">テスト</span></div>
@@ -30,9 +28,9 @@ const App = {
       </header>
 
       <nav v-if="state.step > 0" class="progress" aria-label="進み具合">
-        <button v-for="n in 9" :key="n" class="dot" :class="{ now: state.step === n, done: n < state.step }"
+        <button v-for="n in LAST_STEP" :key="n" class="dot" :class="{ now: state.step === n, done: n < state.step }"
           :disabled="n >= state.step || state.busy" :title="STEP_TITLES[n]" @click="go(n)">{{ n }}</button>
-        <span class="progress-title">{{ state.step }}/9 {{ STEP_TITLES[state.step] }}</span>
+        <span class="progress-title">{{ state.step }}/{{ LAST_STEP }} {{ STEP_TITLES[state.step] }}</span>
       </nav>
 
       <main>
@@ -50,10 +48,9 @@ const App = {
           <PickStep v-else-if="state.step === 3" />
           <NarrowStep v-else-if="state.step === 4" />
           <PolicyStep v-else-if="state.step === 5" mode="confirm" />
-          <StrategyStep v-else-if="state.step === 6" />
-          <DecomposeStep v-else-if="state.step === 7" />
-          <ReviewDateStep v-else-if="state.step === 8" />
-          <ExportStep v-else-if="state.step === 9" />
+          <DecomposeStep v-else-if="state.step === 6" />
+          <ReviewDateStep v-else-if="state.step === 7" />
+          <ExportStep v-else-if="state.step === 8" />
         </template>
       </main>
 
@@ -63,7 +60,7 @@ const App = {
         <button v-if="state.step === 2" class="secondary" @click="skipPolicy">スキップ(あとで決める)</button>
         <button class="primary big" :disabled="!canNext || state.busy" @click="next">{{ nextLabel }}</button>
       </footer>
-      <footer v-else-if="state.step === 9" class="navbar">
+      <footer v-else-if="state.step === LAST_STEP" class="navbar">
         <button class="secondary" @click="prev">← 戻る</button>
       </footer>
     </div>`,

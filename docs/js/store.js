@@ -13,6 +13,7 @@ const db = () => getDb();
 
 export const MAX_GOALS = 3;
 export const MAX_STEPS = 5;
+export const CARD_WARN_AT = 5; // 工程づくりのカード(目標 or 目標×場所)がこの枚数以上になると「多すぎませんか?」と確認する
 
 const freshDraft = () => ({
   roles: [...DEFAULT_ROLES], customRole: '', months: 6, customMonths: false,
@@ -38,6 +39,7 @@ export const state = reactive({
   activeSpId: null, // ステップ3で今操作している参加者(session_participant.id)
   activeUnit: null, // ステップ7で編集中の作業単位 key
   completedUnits: {},
+  ackMany: false,   // カードが多すぎる警告に「このまま続ける」と答えたか
 });
 
 /* ---------- 起動・ログイン ---------- */
@@ -132,7 +134,7 @@ export function resetSession() {
   Object.assign(state, {
     participants: [], session: null, sessionParticipants: [], selections: [],
     goals: [], goalLocations: [], subSteps: [], subStepTags: [], policy: null, practice: [],
-    draft: freshDraft(), activeSpId: null, activeUnit: null, completedUnits: {}, maxStep: 0,
+    draft: freshDraft(), activeSpId: null, activeUnit: null, completedUnits: {}, ackMany: false, maxStep: 0,
   });
 }
 
@@ -164,23 +166,24 @@ export const createChild = ({ name, age, sex, isTest }) => run(async () => {
 
 /* ---------- 画面遷移 ---------- */
 
-const hasMultiLocation = () => state.goals.some((g) => state.goalLocations.filter((l) => l.goal_id === g.id).length > 1);
+// 画面の番号: 1基本情報 2基本方針(仮) 3目標選択・絞り込み 4優先順位・場所 5基本方針(確定) 6工程・工夫づくり 7振り返り日 8計画書出力
+export const LAST_STEP = 8;
 
 export function go(n) {
   state.step = n;
   state.maxStep = Math.max(state.maxStep, n);
   state.error = '';
   state.activeUnit = null;
-  if (n === 3 && !state.activeSpId) state.activeSpId = firstPendingSpId();
-  if (n === 4) initGoalDraft();
+  if (n === 3) {
+    if (!state.activeSpId) state.activeSpId = firstPendingSpId();
+    initGoalDraft();
+  }
   if (n === 5 && state.policy) state.draft.policy = { safety: state.policy.safety_challenge_axis, pace: state.policy.pace_axis };
-  if (n === 8 && !state.draft.reviewDate) state.draft.reviewDate = state.session.next_review_date || defaultReviewDate();
+  if (n === 7 && !state.draft.reviewDate) state.draft.reviewDate = state.session.next_review_date || defaultReviewDate();
 }
 
 export function prev() {
-  let n = state.step - 1;
-  if (n === 6 && !hasMultiLocation()) n = 5;
-  go(Math.max(n, 1));
+  go(Math.max(state.step - 1, 1));
 }
 
 export function next() {
@@ -190,10 +193,9 @@ export function next() {
     if (s === 2) await savePolicy('before_goal');
     if (s === 4) await saveGoals();
     if (s === 5) await savePolicy('after_goal');
-    if (s === 8) await saveReviewDate();
-    let n = s + 1;
-    if (n === 6 && !hasMultiLocation()) n = 7;
-    go(n);
+    if (s === 6) await settleUnits();
+    if (s === 7) await saveReviewDate();
+    go(s + 1);
   });
 }
 
@@ -203,10 +205,10 @@ export const canNext = computed(() => {
   const d = state.draft;
   switch (state.step) {
     case 1: return d.roles.length >= 1 && Number(d.months) >= 1;
-    case 3: return state.sessionParticipants.length > 0 && state.sessionParticipants.every((sp) => sp.turn_status !== 'pending');
+    case 3: return state.sessionParticipants.length > 0 && state.sessionParticipants.every((sp) => sp.turn_status !== 'pending') && d.goalDraft.length >= 1;
     case 4: return d.goalDraft.length >= 1 && d.goalDraft.every((g) => g.locs.length >= 1);
-    case 7: return !state.activeUnit && unitList.value.length > 0 && unitList.value.every((u) => state.completedUnits[u.key]);
-    case 8: return !!d.reviewDate;
+    case 6: return !state.activeUnit && unitList.value.length > 0 && !tooManyCards.value; // 工程は空欄のままでも進める(あとで手書きもOK)
+    case 7: return !!d.reviewDate;
     default: return true;
   }
 });
@@ -302,6 +304,7 @@ export async function toggleSelection(pid, ref) {
   if (existing) {
     await db().remove('illustration_selection', { id: existing.id });
     state.selections = state.selections.filter((x) => x.id !== existing.id);
+    pruneGoalDraft(); // 誰も選ばなくなったイラストは、絞り込みの枠からも外す
     return 'removed';
   }
   if (selectionsOf(pid).length >= MAX_GOALS) return 'max';
@@ -333,7 +336,7 @@ export async function reopenTurn(spId) {
   state.activeSpId = sp.id;
 }
 
-/* ---------- ステップ4: 絞り込み + 場所 ---------- */
+/* ---------- ステップ3・4: 絞り込み(枠1〜3)+ 優先順位・場所 ---------- */
 
 // 選ばれたイラスト一覧。誰が選んだかを付ける(本人が先頭)
 export const candidates = computed(() => {
@@ -349,6 +352,11 @@ export const candidates = computed(() => {
       .sort((a, b) => roleRank(a.role) - roleRank(b.role)),
   }));
 });
+
+function pruneGoalDraft() {
+  const refs = new Set(candidates.value.map((c) => c.ref));
+  state.draft.goalDraft = state.draft.goalDraft.filter((g) => refs.has(g.ref));
+}
 
 function initGoalDraft() {
   const refs = new Set(candidates.value.map((c) => c.ref));
@@ -366,6 +374,18 @@ export function toggleGoalDraft(ref) {
   if (i >= 0) { gd.splice(i, 1); return true; }
   if (gd.length >= MAX_GOALS) return false;
   gd.push({ ref, locs: [] });
+  return true;
+}
+
+// カードを枠(1〜3)へ置く。すでに枠にあるカードなら、置き場所を移す。枠がいっぱいなら false
+export function placeGoalDraft(ref, index) {
+  const gd = state.draft.goalDraft;
+  const i = gd.findIndex((g) => g.ref === ref);
+  let item;
+  if (i >= 0) [item] = gd.splice(i, 1);
+  else if (gd.length >= MAX_GOALS) return false;
+  else item = { ref, locs: [] };
+  gd.splice(Math.min(Math.max(index, 0), gd.length), 0, item);
   return true;
 }
 
@@ -424,13 +444,17 @@ async function saveGoals() {
     }
   }
   state.completedUnits = {};
+  state.ackMany = false;
 }
 
-/* ---------- ステップ6: 戦略モード ---------- */
+/* ---------- ステップ6: 場所ごとの工夫(戦略モード)+ 工程づくり ---------- */
 
 export const goalsSorted = computed(() => [...state.goals].sort((a, b) => a.priority - b.priority));
 export const locsOf = (goalId) => state.goalLocations.filter((l) => l.goal_id === goalId);
 export const multiLocGoals = computed(() => goalsSorted.value.filter((g) => locsOf(g.id).length > 1));
+
+// 「場所ごとに工夫を変えますか?」への答え(場所が複数ある目標ごと)
+export const strategyModeOf = (goalId) => (locsOf(goalId)[0]?.strategy_mode === 'per_location' ? 'per_location' : 'shared');
 
 export async function setStrategyMode(goalId, mode) {
   for (const l of locsOf(goalId)) {
@@ -438,9 +462,10 @@ export async function setStrategyMode(goalId, mode) {
     await db().update('goal_location', l.id, { strategy_mode: mode });
   }
   state.completedUnits = {};
+  state.ackMany = false;
 }
 
-/* ---------- ステップ7: 工程分解 + 調整戦略タグ ---------- */
+/* ---------- 工程分解 + 調整戦略タグ(ステップ6の中身) ---------- */
 
 // 作業単位: 「共通」なら目標1つ=1単位、「場所ごと」なら 目標×場所 = 1単位
 export const unitList = computed(() => {
@@ -456,6 +481,9 @@ export const unitList = computed(() => {
   }
   return out;
 });
+
+// カードが多すぎるとき(かつ、まだ「このまま続ける」と答えていないとき)
+export const tooManyCards = computed(() => unitList.value.length >= CARD_WARN_AT && !state.ackMany);
 
 export const stepsOf = (locId) => state.subSteps.filter((s) => s.goal_location_id === locId).sort((a, b) => a.step_order - b.step_order);
 export const tagLinksOf = (stepId) => state.subStepTags
@@ -543,13 +571,27 @@ async function syncShared(unit) {
   }
 }
 
+// 工程は空欄のままでもOK(枠だけ作って、あとで手書きする使い方もある)
 export const completeUnit = (unit) => run(async () => {
-  const steps = stepsOf(unit.loc.id);
-  if (!steps.length || steps.some((s) => !s.description.trim())) throw new Error('工程を1つ以上、空欄なしで入れてください');
   await syncShared(unit);
   state.completedUnits[unit.key] = true;
   state.activeUnit = null;
 });
+
+// 「次へ」を押したとき、まだ「できた」にしていないカードも確定する(「同じ工夫」の他の場所へのコピーもここで行う)
+async function settleUnits() {
+  for (const u of unitList.value) {
+    if (!state.completedUnits[u.key]) {
+      await syncShared(u);
+      state.completedUnits[u.key] = true;
+    }
+  }
+}
+
+// 空の枠を、3つになるまで足す(手で書く人向け)
+export async function addBlankFrames(locId, upTo = 3) {
+  while (stepsOf(locId).length < Math.min(upTo, MAX_STEPS)) await addStep(locId);
+}
 
 export function reopenUnit(unit) {
   state.completedUnits[unit.key] = false;
@@ -569,7 +611,7 @@ export async function registerGoldExample(goalDescription, locId) {
   await db().insert('gold_example', { id: uuid(), goal_description: goalDescription.trim(), sub_steps_json: steps });
 }
 
-/* ---------- ステップ8: 振り返り日 ---------- */
+/* ---------- ステップ7: 振り返り日 ---------- */
 
 function defaultReviewDate() {
   const d = new Date(state.session.held_at);

@@ -1,5 +1,5 @@
-// ステップ9: Excel出力(SheetJS・ブラウザ内処理)。レイアウトは仮(保留事項に記載)。
-import { catOf } from './data/master.js';
+// ステップ8: Excel出力(SheetJS・ブラウザ内処理)。レイアウトは仮(保留事項に記載)。
+import { catOf, axisShares } from './data/master.js';
 import { illustInfo } from './data/illustrations.js';
 
 function loadSheetJs() {
@@ -34,6 +34,7 @@ export function buildSheets(st) {
     for (const loc of st.goalLocations.filter((l) => l.goal_id === g.id)) {
       const steps = st.subSteps.filter((s) => s.goal_location_id === loc.id).sort((a, b) => a.step_order - b.step_order);
       const mode = loc.strategy_mode === 'per_location' ? '場所ごとに変える' : '同一';
+      if (!steps.length) plan.push([g.priority, label(g.illustration_ref), loc.location_category, mode, '', '', '', '', '', '']); // 工程が空でも、目標と場所の行は残す
       for (const s of steps) {
         const links = st.subStepTags.filter((l) => l.sub_step_id === s.id);
         const base = [g.priority, label(g.illustration_ref), loc.location_category, mode, s.step_order, s.description, s.difficulty_score];
@@ -56,10 +57,11 @@ export function buildSheets(st) {
   }
 
   const pol = st.policy;
+  const ratio = (v, l, r) => { const a = axisShares(v); return `${l} ${a.left} : ${a.right} ${r}`; };
   const policy = [
-    ['項目', '値', '説明'],
-    ['セーフティ⇔チャレンジ', pol?.safety_challenge_axis ?? '', '-5=セーフティ重視 〜 +5=チャレンジ重視'],
-    ['個人のペース⇔集団のペース', pol?.pace_axis ?? '', '-5=個人のペース重視 〜 +5=集団のペース重視'],
+    ['項目', '割合(合計10)', '説明'],
+    ['セーフティ⇔チャレンジ', pol ? ratio(pol.safety_challenge_axis, 'セーフティ', 'チャレンジ') : '', '数字が大きいほうを、より重視する'],
+    ['個人のペース⇔集団のペース', pol ? ratio(pol.pace_axis, '個人', '集団') : '', '数字が大きいほうを、より重視する'],
     ['決めたタイミング', pol ? (pol.decided_timing === 'before_goal' ? '目標選択の前' : '目標選択の後') : '', ''],
   ];
   return { info, plan, picks, policy };

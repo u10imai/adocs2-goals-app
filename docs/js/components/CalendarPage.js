@@ -87,10 +87,21 @@ export const CalendarPage = {
       selected.value = date;
       await stamp(place);
     };
-    const pickSuggested = async () => { flash({ set: '📌 真ん中あたりの日を入れました', after_final: '期間が短いので、日付を自分でえらんでください' }[await setMidDate(suggestMidDate())] || ''); tool.value = 'mid'; month.value = monthOf(mid.value || final.value); };
-
-    // 「中間も決めますか?」の促し(最後の日を決めたあと、まだ中間がないとき)
-    const midHint = computed(() => !standalone && tool.value === 'final' && !!final.value && !mid.value);
+    // 「📌 中間確認日」を押したときに出る選択肢。最後の日を決めるときには、中間の促しは出さない
+    const pickSuggested = async () => {
+      if (!final.value) return flash('先に「🏁 最後の日」をえらんでください');
+      const sug = suggestMidDate();
+      if (sug === mid.value) return flash('📌 もう おすすめの日が入っています');
+      const r = await setMidDate(sug);
+      flash({ set: '📌 真ん中あたりの日を入れました', after_final: '期間が短いので、日付を自分でえらんでください' }[r] || '');
+      month.value = monthOf(mid.value || final.value);
+    };
+    const pickMyself = () => {
+      if (!final.value) return flash('先に「🏁 最後の日」をえらんでください');
+      month.value = monthOf(mid.value || suggestMidDate());
+      flash('📌 カレンダーの日を タップしてください');
+    };
+    const clearMid = async () => { if (mid.value) flash({ cleared: '📌 中間確認日を はずしました' }[await setMidDate(mid.value)] || ''); };
 
     const daysLeft = computed(() => (final.value ? Math.round((toDate(final.value) - toDate(today)) / 86400000) : null));
     const stampDays = computed(() => new Set(state.practice.map((p) => p.log_date)).size);
@@ -106,8 +117,8 @@ export const CalendarPage = {
     const gcal = (e) => googleCalendarUrl(e.date, e.title, e.details);
 
     return {
-      state, LOCATIONS, DOW, tools, tool, help, selected, msg, popKey, month, cells, cls, has, label, shift, onDay, onQuad, wide, stamp, pickSuggested,
-      midHint, final, mid, daysLeft, stampDays, monthStampDays, events, gcal, downloadIcs, today, jp, goals: goalsSorted, standalone,
+      state, LOCATIONS, DOW, tools, tool, help, selected, msg, popKey, month, cells, cls, has, label, shift, onDay, onQuad, wide, stamp, pickSuggested, pickMyself, clearMid,
+      final, mid, daysLeft, stampDays, monthStampDays, events, gcal, downloadIcs, today, jp, goals: goalsSorted, standalone,
       goToday: () => { month.value = monthOf(today); },
       goFinal: () => { month.value = monthOf(final.value); },
     };
@@ -124,11 +135,13 @@ export const CalendarPage = {
       </div>
       <p class="cal-help">{{ help }}</p>
 
-      <div v-if="midHint" class="notice cal-hint">
-        📌 <b>中間確認日も決めますか?</b>(なくてもOKです。あとで決めることもできます)
+      <div v-if="tool === 'mid'" class="notice cal-hint">
+        📌 <b>中間確認日</b>:
+        <span v-if="mid"><b>{{ jp(mid) }}</b></span><span v-else class="muted">まだ きめていません(なくてもOK)</span>
         <div class="row">
-          <button class="secondary small" @click="tool = 'mid'">中間の日をえらぶ</button>
-          <button class="secondary small" @click="pickSuggested">おすすめ(期間の真ん中)を入れる</button>
+          <button class="secondary small" @click="pickMyself">📅 自分で きめる</button>
+          <button class="secondary small" @click="pickSuggested">✨ おすすめの日(期間の真ん中)</button>
+          <button v-if="mid" class="secondary small" @click="clearMid">はずす</button>
         </div>
       </div>
 

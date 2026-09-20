@@ -1,11 +1,11 @@
 import { ref, computed } from 'vue';
-import { state, sortedSps, roleOfPid, currentTurn, selectionsOf, toggleSelection, saveReason, finishTurn, reopenTurn, MAX_GOALS } from '../store.js';
+import { state, sortedSps, roleOfPid, currentTurn, selectionsOf, toggleSelection, saveReason, finishTurn, reopenTurn, candidates, toggleGoalDraft, placeGoalDraft, MAX_GOALS } from '../store.js';
 import { BUILTIN_ILLUSTRATIONS, ILLUSTRATION_CATEGORIES } from '../data/illustrations.js';
 import { roleIcon, askExamplesFor, STAMPS } from '../data/master.js';
 import { Illust } from './common.js';
 import { PhotoDialog } from './PhotoDialog.js';
 
-// ステップ3: 目標選択(ターン制)
+// ステップ3: 目標選択(ターン制)+ みんな選んだあと、そのまま話し合って「枠1〜3」に絞り込む
 export const PickStep = {
   components: { Illust, PhotoDialog },
   setup() {
@@ -40,23 +40,34 @@ export const PickStep = {
     const statusIcon = (s) => ({ pending: '⏳', selected: '✅', skipped: '⏭️' }[s]);
     const onAdded = (r) => { if (currentTurn.value) pick(r); };
 
-    return { state, sortedSps, roleOfPid, currentTurn, selectionsOf, category, categories, shown, mine, isMine, askText, pick, stamp, toast, showPhoto, onAdded, finishTurn, reopenTurn, saveReason, roleIcon, statusIcon, MAX_GOALS };
+    // ---- 絞り込み: 下のカードを、上の枠(1〜3)へ置く。タップでも、ドラッグでもOK ----
+    const slots = computed(() => Array.from({ length: MAX_GOALS }, (_, i) => state.draft.goalDraft[i]?.ref || null));
+    const slotOf = (r) => state.draft.goalDraft.findIndex((g) => g.ref === r);
+    const say = (t) => { toast.value = t; setTimeout(() => { if (toast.value === t) toast.value = ''; }, 2200); };
+    const tapCard = (r) => { if (slotOf(r) < 0 && state.draft.goalDraft.length >= MAX_GOALS) return say(`枠は ${MAX_GOALS}つまで。どれかをはずしてください`); toggleGoalDraft(r); };
+    const dragging = ref('');
+    const onDrop = (i) => {
+      if (dragging.value && !placeGoalDraft(dragging.value, i)) say(`枠は ${MAX_GOALS}つまで。どれかをはずしてください`);
+      dragging.value = '';
+    };
+    const pickersOf = (r) => candidates.value.find((c) => c.ref === r)?.pickers || [];
+
+    return { candidates, slots, slotOf, tapCard, dragging, onDrop, pickersOf, toggleGoalDraft, state, sortedSps, roleOfPid, currentTurn, selectionsOf, category, categories, shown, mine, isMine, askText, pick, stamp, toast, showPhoto, onAdded, finishTurn, reopenTurn, saveReason, roleIcon, statusIcon, MAX_GOALS };
   },
   template: `
     <section class="card">
       <div class="turn-bar">
         <button v-for="sp in sortedSps" :key="sp.id" class="turn-chip"
-          :class="{ big: roleOfPid(sp.participant_id) === '本人', active: currentTurn?.sp.id === sp.id, done: sp.turn_status !== 'pending' }"
+          :class="{ active: currentTurn?.sp.id === sp.id, done: sp.turn_status !== 'pending' }"
           @click="reopenTurn(sp.id)">
           <span class="turn-avatar">{{ roleIcon(roleOfPid(sp.participant_id)) }}</span>
           <span class="turn-role">{{ roleOfPid(sp.participant_id) }}</span>
-          <span class="turn-status">{{ statusIcon(sp.turn_status) }} <template v-if="selectionsOf(sp.participant_id).length">{{ selectionsOf(sp.participant_id).length }}こ</template></span>
+          <span class="turn-status">{{ statusIcon(sp.turn_status) }}</span>
         </button>
       </div>
 
       <template v-if="currentTurn">
-        <div class="your-turn">🌟 いまは <b>{{ currentTurn.role }}</b> の ばんです</div>
-        <div class="ask-example">💡 聞き方の例:「{{ askText }}」</div>
+        <div class="ask-example">💡 <b>{{ currentTurn.role }}</b>への聞き方の例:「{{ askText }}」</div>
         <p class="muted">気になるものを、{{ MAX_GOALS }}つまで えらべます(えらばなくてもOK)。いまの選択: {{ mine.length }} / {{ MAX_GOALS }}</p>
 
         <div class="cat-filter">
@@ -86,14 +97,36 @@ export const PickStep = {
         </div>
       </template>
 
-      <div v-else class="all-done">
-        <h3>🎉 みんな えらびおわりました</h3>
-        <div v-for="sp in sortedSps" :key="sp.id" class="done-row">
-          <b>{{ roleIcon(roleOfPid(sp.participant_id)) }} {{ roleOfPid(sp.participant_id) }}</b>
-          <span v-if="!selectionsOf(sp.participant_id).length" class="muted">(選択なし)</span>
-          <Illust v-for="s in selectionsOf(sp.participant_id)" :key="s.id" :value="s.illustration_ref" :size="56" />
+      <div v-else class="narrow">
+        <h3>🎉 みんな えらびおわりました。はなしあって、もくひょうを しぼろう</h3>
+        <p class="muted">下のカードを、上の枠(1〜{{ MAX_GOALS }})へ もっていきます(タップでも、ドラッグでもOK)。カードの人のマークは、えらんだ人です。</p>
+
+        <div class="slots">
+          <div v-for="(r, i) in slots" :key="i" class="slot" :class="{ filled: !!r }" @dragover.prevent @drop.prevent="onDrop(i)">
+            <span class="slot-no">{{ i + 1 }}</span>
+            <template v-if="r">
+              <button class="slot-card" @click="toggleGoalDraft(r)" :aria-label="'枠' + (i + 1) + 'からはずす'">
+                <Illust :value="r" :size="80" />
+                <span class="pickers"><span v-for="(p, k) in pickersOf(r)" :key="k" class="picker" :title="p.reason">{{ roleIcon(p.role) }}</span></span>
+                <span class="slot-x">×</span>
+              </button>
+            </template>
+            <span v-else class="slot-empty">ここに おく</span>
+          </div>
         </div>
-        <p class="muted">直したいときは、上の人のアイコンをタップするとやり直せます。</p>
+
+        <p v-if="!candidates.length" class="notice">まだ候補がありません。上の人のアイコンをタップして、えらびなおしてください。</p>
+        <div class="cand-grid">
+          <button v-for="c in candidates" :key="c.ref" class="cand-card" :class="{ kept: slotOf(c.ref) >= 0 }" draggable="true"
+            @dragstart="dragging = c.ref" @dragend="dragging = ''" @click="tapCard(c.ref)">
+            <Illust :value="c.ref" :size="96" />
+            <div class="pickers">
+              <span v-for="(p, i) in c.pickers" :key="i" class="picker" :title="p.reason">{{ roleIcon(p.role) }}<small>{{ p.role }}</small></span>
+            </div>
+            <span v-if="slotOf(c.ref) >= 0" class="kept-badge">{{ slotOf(c.ref) + 1 }}</span>
+          </button>
+        </div>
+        <p class="muted small">直したいときは、上の人のアイコンをタップすると、その人の選びなおしができます。</p>
       </div>
 
       <div v-if="toast" class="toast">{{ toast }}</div>

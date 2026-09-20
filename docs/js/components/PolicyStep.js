@@ -14,9 +14,10 @@ export const PolicyStep = {
       <p v-if="mode === 'draft'" class="muted">目標をえらぶ前の「考え方の傾き」です。あとで確定するので、迷ったらスキップしても大丈夫です。</p>
       <p v-else-if="state.policy" class="muted">ステップ2で決めた内容です。変える場合はスライダーを動かしてください。</p>
       <p v-else class="muted">ステップ2をスキップしたので、ここで決めます。目標を見たうえでの、考え方の傾きを選んでください。</p>
+      <p class="muted small">はじめは半分ずつ(5:5)です。スライダーを動かすと、重視する側の割合が増えます。</p>
 
       <div class="axis-block">
-        <h3>安全 ⇔ チャレンジ</h3>
+        <h3>セーフティ ⇔ チャレンジ</h3>
         <AxisSlider v-model="p.safety" left="セーフティ重視" right="チャレンジ重視" leftIcon="🛡️" rightIcon="🚀" />
       </div>
       <div class="axis-block">

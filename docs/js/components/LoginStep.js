@@ -1,8 +1,12 @@
 import { ref } from 'vue';
+import { WheelPicker } from './common.js';
 import { state, login, register, demoLogin, createChild, pickChild, nameOf, exportRoster, openCalendar } from '../store.js';
 
 // ステップ0: ログイン + 対象児の選択
+const AGE_OPTIONS = [{ value: '', label: '未選択' }, ...Array.from({ length: 31 }, (_, n) => ({ value: n, label: `${n}歳` }))];
+
 export const LoginStep = {
+  components: { WheelPicker },
   setup() {
     const mode = ref('login'); // login | register
     const f = ref({ name: '', email: '', password: '' });
@@ -21,7 +25,7 @@ export const LoginStep = {
     };
     const adding = ref(false);
     const submit = () => (mode.value === 'login' ? login(f.value.email, f.value.password) : register(f.value.name, f.value.email, f.value.password));
-    return { state, mode, f, newChild, adding, openAdd, sorted, openCalendar, query, showExport, pw, exported, doExport, nameOf, submit, demoLogin, createChild, pickChild };
+    return { AGE_OPTIONS, state, mode, f, newChild, adding, openAdd, sorted, openCalendar, query, showExport, pw, exported, doExport, nameOf, submit, demoLogin, createChild, pickChild };
   },
   template: `
     <section class="card center-card">
@@ -73,8 +77,8 @@ export const LoginStep = {
             <button type="button" class="big-chip" :class="{ on: newChild.isTest }" @click="newChild.isTest = true">🧪 テスト</button>
           </div>
           <p class="muted small">IDは自動で振られます(本番は001から、テストは1001から)。名前は、目標のデータとは別の「名簿」に分けて保存されます。</p>
-          <div class="row">
-            <label>年齢<input v-model="newChild.age" type="number" min="0" max="30"></label>
+          <div class="row top">
+            <div class="field">年齢<WheelPicker v-model="newChild.age" :options="AGE_OPTIONS" aria-label="年齢" /></div>
             <label>性別
               <select v-model="newChild.sex"><option value="">未選択</option><option>男</option><option>女</option><option>その他</option></select>
             </label>
