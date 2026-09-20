@@ -1,0 +1,53 @@
+# 毎日、全データ(目標データ・名簿)を取得して Google Drive に保存する。
+# Secrets: SUPABASE_URL / BACKUP_EXPORT_SECRET / GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_OAUTH_REFRESH_TOKEN
+# ログには件数しか出さない(名前は出さない)。成果物(artifact)としても保存しない。
+name: Daily Backup to Google Drive
+
+on:
+  schedule:
+    - cron: '0 22 * * *' # UTC 22:00 = JST 翌07:00
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check secrets are configured
+        id: check
+        env:
+          URL: ${{ secrets.SUPABASE_URL }}
+          SECRET: ${{ secrets.BACKUP_EXPORT_SECRET }}
+          TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
+        run: |
+          if [ -z "$URL" ] || [ -z "$SECRET" ] || [ -z "$TOKEN" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Secrets が未設定のためスキップしました(設定後に自動で動きます)"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.configured == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.configured == 'true'
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+        if: steps.check.outputs.configured == 'true'
+      - name: Export and upload to Google Drive
+        if: steps.check.outputs.configured == 'true'
+        run: node scripts/backup-to-drive.mjs
+        env:
+          FUNCTIONS_BASE_URL: ${{ secrets.SUPABASE_URL }}/functions/v1
+          BACKUP_EXPORT_SECRET: ${{ secrets.BACKUP_EXPORT_SECRET }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}

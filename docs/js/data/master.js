@@ -1,0 +1,55 @@
+// マスタ類(設計まとめ 7章・8章)
+export const STEP_TITLES = [
+  'ログイン', '基本情報', '基本方針(仮)', '目標選択', '絞り込み・場所',
+  '基本方針(確定)', '戦略モード', '工程分解・調整戦略', '振り返り日', '計画書出力',
+];
+
+// 調整カテゴリ(3分類・固定)。icon は絵文字の仮置き(アイコンライブラリ選定は保留)
+export const CATEGORIES = [
+  { key: 'tool_env', label: '道具・周囲の環境を変更する', short: '道具・環境', icon: '🔧', color: '#d98a1f' },
+  { key: 'support_cue', label: '支援方法・言葉かけの方法を変更する', short: '支援・声かけ', icon: '💬', color: '#3d86c6' },
+  { key: 'activity_form', label: '活動自体の形式・規模を変更する', short: '活動の形式・規模', icon: '➡️', color: '#4c9a5e' },
+];
+export const catOf = (key) => CATEGORIES.find((c) => c.key === key) || CATEGORIES[0];
+
+export const INITIAL_TAGS = {
+  tool_env: ['補助具を使う', '道具の形状・素材を変える', '配置を変える', '照明・音を調整する', '実施場所を変える'],
+  support_cue: ['支援量を増減する', '支援のタイミングを変える', '声かけの量を増減する', '視覚的な手がかりを使う(絵カード・タイマー)', '支援者を変える'],
+  activity_form: ['手順を増減する', '取り組む量・回数を増減する', '実施する姿勢・体勢を変える', '別の活動に置き換える', '目標水準を調整する'],
+};
+
+export const GOLD_EXAMPLE_SEED = [{
+  goal_description: '食事動作(自分で食事を食べる)',
+  sub_steps_json: [
+    { order: 1, description: '今日の食事を認識する' },
+    { order: 2, description: '食具を手に取る' },
+    { order: 3, description: '食具から食事に向かって手を伸ばす' },
+    { order: 4, description: '食事をすくう' },
+    { order: 5, description: '口元に持ってきて口に取り込んで食べる' },
+  ],
+}];
+
+export const LOCATIONS = [
+  { key: '学校', icon: '🏫' },
+  { key: '家', icon: '🏠' },
+  { key: '放課後等デイ', icon: '🚌' },
+];
+
+// ターン順のデフォルト: 本人 → 保護者 → 支援者(8章)
+export const ROLE_OPTIONS = ['本人', '保護者', '支援者1', '支援者2'];
+export const DEFAULT_ROLES = ['本人', '保護者', '支援者1'];
+export const roleRank = (role) => {
+  const i = ROLE_OPTIONS.indexOf(role);
+  return i === -1 ? 99 : i;
+};
+export const roleIcon = (role) => (role === '本人' ? '🧒' : role.startsWith('保護者') ? '👪' : '🧑‍⚕️');
+
+// 聞き方の例文(8章・Easy)。文言は仮(保留事項に記載)
+export const ASK_EXAMPLES = {
+  本人: ['どれが すき?', 'やってみたいなって おもうのは どれかな?', 'どれが たのしそう?'],
+  保護者: ['お子さんに できるようになってほしいこと、生活の中で気になっていることはどれですか?', 'お子さんが好きそうだと思うものはどれですか?'],
+  支援者: ['関わっている中で、伸ばしたい・大切だと感じる場面はどれですか?', '本人の強みが活かせそうなものはどれですか?'],
+};
+export const askExamplesFor = (role) => (role === '本人' ? ASK_EXAMPLES.本人 : role.startsWith('保護者') ? ASK_EXAMPLES.保護者 : ASK_EXAMPLES.支援者);
+
+export const STAMPS = ['いいね!', 'すてき!', 'やったね!', 'それだ!', 'ばっちり!'];

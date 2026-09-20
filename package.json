@@ -1,0 +1,9 @@
+{
+  "name": "adocs-goal-app",
+  "private": true,
+  "type": "module",
+  "description": "ADOC-S連携 目標設定アプリ(バックアップ用スクリプトの依存のみ。アプリ本体は docs/ にあり、ビルド不要)",
+  "dependencies": {
+    "googleapis": "^173.0.0"
+  }
+}

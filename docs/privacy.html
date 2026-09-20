@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>プライバシーポリシー|もくひょうアプリ(ADOC-S連携)</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main>
+    <article class="card doc">
+      <h1>プライバシーポリシー</h1>
+      <p class="updated">最終更新: 2026年9月20日</p>
+      <p>このページは、「もくひょうアプリ(ADOC-S連携)」のバックアップ機能(Google Cloud上のアプリ名: adocs2-backup)が、Googleのユーザーデータをどのように扱うかを説明するものです。<a href="about.html">アプリの説明</a>もご覧ください。</p>
+
+      <h2>1. 取得するGoogleのユーザーデータ</h2>
+      <ul>
+        <li>このバックアップ機能が利用するGoogleの許可範囲(スコープ)は、<code>https://www.googleapis.com/auth/drive.file</code> の1つだけです。</li>
+        <li>この範囲では、<b>このアプリ自身が作成したフォルダとファイルにだけ</b>アクセスできます。Googleドライブにあるその他のファイルを、閲覧・変更・削除することはできません。</li>
+        <li>メールアドレス、氏名、連絡先など、Googleアカウントのその他の情報は取得しません。</li>
+      </ul>
+
+      <h2>2. 利用目的</h2>
+      <p>運営者(このアプリの管理者本人)のGoogleドライブに、アプリの記録データのバックアップファイルを、毎日保存するためだけに使います。</p>
+
+      <h2>3. 第三者への提供・その他の利用</h2>
+      <ul>
+        <li>Googleのユーザーデータを、第三者に提供・販売・共有することはありません。</li>
+        <li>広告や、ユーザーのプロファイリング、AIモデルの学習には使用しません。</li>
+        <li>このアプリによる、Google APIから受け取った情報の使用と、他のアプリへの転送は、<a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API サービスのユーザーデータに関するポリシー</a>(限定的な使用の要件を含む)に準拠します。</li>
+      </ul>
+
+      <h2>4. 利用できる人</h2>
+      <p>このバックアップ機能のGoogleアカウントの認可を行うのは、運営者本人だけです。一般の利用者に、Googleアカウントでのログインや認可を求めることはありません。</p>
+
+      <h2>5. 保管とセキュリティ</h2>
+      <ul>
+        <li>認可の情報(リフレッシュトークン等)は、GitHubの暗号化された保管領域(Secrets)にのみ保存し、公開されるファイルには含めません。</li>
+        <li>バックアップファイルは、運営者のGoogleドライブの専用フォルダに保存され、他の人と共有しません。</li>
+        <li>バックアップされるのは、アプリの記録データです。データは、運営者の管理下にある、Supabaseのデータベースから取得します。</li>
+      </ul>
+
+      <h2>6. 保存期間と削除</h2>
+      <p>バックアップファイルは、運営者が削除するまでドライブに残ります。運営者は、いつでも、Googleアカウントの「サードパーティのアクセス」からこのアプリのアクセス権を取り消し、ドライブのフォルダを削除できます。取り消した後は、このアプリはGoogleドライブにアクセスできません。</p>
+
+      <h2>7. お問い合わせ</h2>
+      <p>運営者への連絡は、GitHubのIssues(<a href="https://github.com/u10imai/adocs2-goals-app/issues" target="_blank" rel="noopener">https://github.com/u10imai/adocs2-goals-app/issues</a>)からお願いします。</p>
+      <p>※ Issuesは誰でも読める場所です。個人情報や、お子さんに関する情報は書き込まないでください。</p>
+
+      <h2>8. 改定</h2>
+      <p>この方針を変更する場合は、このページで告知し、最終更新日を改めます。</p>
+
+      <div class="en">
+        <b>Privacy Policy (English summary)</b>
+        <p>The backup function of this app (Google Cloud app name: adocs2-backup) requests only the <code>https://www.googleapis.com/auth/drive.file</code> scope. It can access only the folder and files that the app itself creates in the site operator's own Google Drive; it cannot view, modify, or delete any other file. It does not access other Google account data such as email address or contacts. The data is used only to save daily backups of this app's records to the operator's Drive. Google user data is not sold, shared with third parties, used for advertising, profiling, or to train AI models. The app's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements. Only the operator authorizes this app. Authorization credentials are stored only in encrypted GitHub Secrets. The operator can revoke access at any time from the Google Account's third-party access page and delete the backup folder. Contact: please open an issue at <a href="https://github.com/u10imai/adocs2-goals-app/issues" target="_blank" rel="noopener">https://github.com/u10imai/adocs2-goals-app/issues</a> (issues are public; do not post personal information).</p>
+      </div>
+    </article>
+  </main>
+</body>
+</html>
