@@ -2,3 +2,8 @@ node_modules/
 .env
 .DS_Store
 *.xlsx
+
+# 非公開メモ(実体はGoogleドライブ側。ここにはショートカットだけ置く)
+作業ログ.md
+保留事項.md
+目標設定アプリ_設計まとめ.md
